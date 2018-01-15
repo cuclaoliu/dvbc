@@ -1,0 +1,73 @@
+module dvbcCore(
+	iClk, iClrn,
+	iClk27M,
+	iValid,
+	iData,
+	iMode,
+	iReq,
+	oByte,
+	oByteValid,
+	oSymbol,
+	oValid);
+	
+	localparam SYMBOLWIDTH = 10;
+	input iClk;
+	input iClrn;
+	input iClk27M;
+	input iValid;
+	input iReq;
+	input[3:0] iMode;
+	input[7:0] iData;
+	output[7:0] oByte;
+	output oByteValid;
+	output[SYMBOLWIDTH-1:0] oSymbol;
+	output oValid;
+	
+	logic ByteReq;
+	logic Valid1, Valid2, Valid3, Valid4, Valid5, Valid6;
+	logic Check1, Check2;
+	logic PSync1, PSync2, PSync3, PSync4;
+	logic[7:0] Data1, Data2, Data3, Data4;
+	logic[SYMBOLWIDTH-1:0] Symbol5, Symbol6;
+	
+	assign oSymbol = Symbol6;
+	assign oValid = Valid6;
+	assign oByte = Data4;
+	assign oByteValid = Valid4;
+	
+	tsSource tssource_inst(
+		.iClk27M(iClk27M), .iData(iData), .iValid(iValid),
+		.iClkSys(iClk), .iClrn(iClrn), .iReq(ByteReq), .oCheck(Check1),
+		.oData(Data1), .oPSync(PSync1), .oValid(Valid1));
+		
+	sync1invert_prbs prbs_inst(
+		.iClk(iClk), .iClrn(iClrn), .iCheck(Check1),
+		.iValid(Valid1), .iData(Data1), .iPSync(PSync1),
+		.oCheck(Check2),
+		.oData(Data2), .oValid(Valid2), .oPSync(PSync2));
+		
+	rsenc rs_inst(
+		.iClk(iClk), .iClrn(iClrn), .iCheck(Check2),
+		.iData(Data2), .iValid(Valid2), .iPSync(PSync2),
+		.oData(Data3), .oPSync(PSync3), .oValid(Valid3));
+		
+	interleavor interleaver_inst(
+		.iClk(iClk), .iClrn(iClrn),
+		.iData(Data3), .iValid(Valid3), .iPSync(PSync3),
+		.oData(Data4), .oValid(Valid4), .oPSync(PSync4));
+	
+	byteToSymbol symbol_inst(
+		.iClk(iClk), .iClrn(iClrn),
+		.iMode(iMode), .iReq(iReq), 
+		.iPSync(PSync4), .iValid(Valid4), .iData(Data4),
+		.oValid(Valid5), .oData(Symbol5), .oReq(ByteReq));
+		defparam symbol_inst.WIDTH = SYMBOLWIDTH;
+		
+	diffEncTwoMSBs diffenc_inst(
+		.iClk(iClk), .iClrn(iClrn),
+		.iMode(iMode),
+		.iData(Symbol5), .iValid(Valid5),
+		.oData(Symbol6), .oValid(Valid6));
+		defparam diffenc_inst.WIDTH = SYMBOLWIDTH;
+		
+endmodule
